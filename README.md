@@ -28,7 +28,7 @@
 
 1. Клонируйте репозиторий:
    ```bash
-   git clone https://github.com/username/repo-name.git
+   git clone https://github.com/Pr0va1der/SteamReviewAI
    ```
 2. Перейдите в папку проекта:
    ```bash
