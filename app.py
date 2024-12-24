@@ -1,0 +1,73 @@
+from flask import Flask, request, jsonify, render_template
+from get_review import process_game_reviews
+import re
+import requests
+
+def extract_app_id(game_url):
+    # Регулярное выражение для извлечения app_id
+    match = re.search(r'/app/(\d+)/', game_url)
+    if match:
+        return match.group(1)  # Возвращаем только app_id
+    return None
+
+def check_game_exists(app_id):
+    """
+    Проверяет, существует ли игра в Steam на основе app_id.
+    """
+    url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get(app_id, {}).get("success", False)
+    except Exception as e:
+        print(f"Ошибка проверки игры в Steam: {e}")
+    return False
+
+def format_text(text):
+    """
+    Функция для замены **текст** на <strong>текст</strong> и ###заголовок### на <h3>заголовок</h3>.
+    """
+    # Заменяем **текст** на <strong>текст</strong>
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    
+    # Заменяем ###заголовок### на <h3>заголовок</h3>
+    text = re.sub(r'^### (.*)', r'<h3>\1</h3>', text, flags=re.MULTILINE)
+    
+    return text
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/process', methods=['POST'])
+def process():
+    try:
+        game_url = request.form.get('game_url')
+        limit = int(request.form.get('limit', 1000))
+
+        if not game_url:
+            return jsonify({"error": "URL игры обязателен!"}), 400
+
+        # Извлечение app_id из game_url
+        app_id = extract_app_id(game_url)
+        if not app_id:
+            return jsonify({"error": "Неверный URL игры!"}), 400
+
+        # Обработка отзывов
+        raw_result = process_game_reviews(app_id, limit)
+
+        # Преобразуем текст с учётом форматирования
+        formatted_result = format_text(raw_result)
+
+        return jsonify({"success": True, "review": formatted_result})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        print(f"Ошибка на сервере: {e}")
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=80, debug=True)

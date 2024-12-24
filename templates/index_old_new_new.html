@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обработка отзывов Steam</title>
+    <style>
+        :root {
+            --background-color: #f8f9fa;
+            --container-bg: rgba(255, 255, 255, 0.9);
+            --text-color: #333;
+            --input-bg: #ddd;
+            --input-text: #333;
+            --button-bg: #333;
+            --button-hover: #555;
+            --button-text: #fff;
+            --icon-color: #333;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --footer-bg: #fff;
+            --footer-text-color: #333;
+        }
+
+        body.dark-theme {
+            --background-color: #121212;
+            --container-bg: rgba(20, 20, 20, 0.9);
+            --text-color: #f1f1f1;
+            --input-bg: #333;
+            --input-text: #f1f1f1;
+            --button-bg: #f1f1f1;
+            --button-hover: #ddd;
+            --button-text: #333;
+            --icon-color: #f1f1f1;
+            --shadow-color: rgba(0, 0, 0, 0.6);
+            --footer-bg: #333;
+            --footer-text-color: #f1f1f1;
+        }
+
+        * {
+            box-sizing: border-box;
+        } 
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: url("{{ url_for('static', filename='steam.png') }}") no-repeat center center;
+            background-size: cover;
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            backdrop-filter: blur(4px);
+            transition: background-color 0.5s, color 0.5s;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: inherit;
+            z-index: -1;
+            filter: blur(6px);
+            transform: scale(1.05);
+        }
+
+        .container {
+            background: var(--container-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 8px 20px var(--shadow-color);
+            max-width: 400px;
+            width: 100%;
+            transition: background-color 0.5s, box-shadow 0.5s;
+            position: relative;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--button-bg);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 4px;
+            background: var(--input-bg);
+            color: var(--input-text);
+            box-shadow: inset 0 2px 4px var(--shadow-color);
+        }
+
+        input::placeholder {
+            color: #aaa;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            box-shadow: 0 4px 8px var(--shadow-color);
+            transition: background 0.3s, box-shadow 0.3s, color 0.3s;
+        }
+
+        button:hover {
+            background-color: var(--button-hover);
+        }
+
+        #progress-container {
+            display: none;
+            margin-top: 20px;
+            background: var(--input-bg);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 20px;
+            background-color: var(--button-bg);
+            transition: width 0.5s ease;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 1.1em;
+        }
+
+        #theme-toggle {
+            position: absolute;
+            top: 40px; 
+            left: 10px;
+            width: 40px;
+            height: 40px;
+            background-color: var(--button-bg);
+            color: var(--icon-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.5em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 8px var(--shadow-color);
+            transition: background-color 0.3s, color 0.3s, transform 0.3s;
+        }
+
+        #theme-toggle:hover {
+            background-color: var(--button-hover);
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body class="dark-theme">
+    <button id="theme-toggle">🌙</button>
+    <div class="container">
+        <h1>Обработка отзывов Steam</h1>
+        <form id="reviewForm">
+            <label for="game_url">Ссылка на игру:</label>
+            <input type="url" id="game_url" name="game_url" placeholder="Введите ссылку на игру" required>
+            
+            <label for="limit">Количество отзывов:</label>
+            <input type="number" id="limit" name="limit" placeholder="Введите количество отзывов" required>
+            
+            <button type="submit">Обработать</button>
+        </form>
+        
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+        
+        <div id="result"></div>
+        
+        <p style="color: red; font-size: 0.9em; margin-top: 20px; text-align: center;">
+            Внимание: анализ проводится с помощью модели искусственного интеллекта, результат может быть нестабильным.
+        </p>
+    </div>
+    <script>
+        document.getElementById("reviewForm").addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const formData = new FormData(this);
+            const progressContainer = document.getElementById("progress-container");
+            const progressBar = document.getElementById("progress-bar");
+            const resultDiv = document.getElementById("result");
+
+            document.body.style.overflow = "hidden";
+
+            progressContainer.style.display = "block";
+            progressBar.style.width = "0%";
+            resultDiv.innerHTML = "";
+
+            try {
+                progressBar.style.width = "30%";
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                const response = await fetch("/process", {
+                    method: "POST",
+                    body: formData
+                });
+
+                progressBar.style.width = "70%";
+
+                if (!response.ok) throw new Error("Ошибка на сервере");
+
+                const data = await response.json();
+                progressBar.style.width = "100%";
+
+                if (data.success) {
+                    resultDiv.innerHTML = `<p>${data.review}</p>`;
+                } else {
+                    resultDiv.innerHTML = `<p style="color: red;">Ошибка: ${data.error}</p>`;
+                }
+            } catch (error) {
+                progressBar.style.width = "100%";
+                resultDiv.innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+            } finally {
+                document.body.style.overflow = "auto";
+            }
+        });
+
+        const themeToggle = document.getElementById("theme-toggle");
+        const body = document.body;
+
+        const savedTheme = localStorage.getItem("theme");
+        if (savedTheme) body.classList.add(savedTheme);
+
+        themeToggle.addEventListener("click", () => {
+            const isDark = body.classList.toggle("dark-theme");
+            const theme = isDark ? "dark-theme" : "";
+            localStorage.setItem("theme", theme);
+
+            themeToggle.textContent = isDark ? "🌙" : "☀️";
+        });
+    </script>
+</body>
+</html>
