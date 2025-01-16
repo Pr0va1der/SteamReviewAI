@@ -176,6 +176,12 @@
             background-color: var(--button-bg);
             transition: width 0.5s ease;
         }
+		
+		#search-result {
+			overflow-wrap: break-word; /* Современный аналог */
+			white-space: pre-wrap; /* Сохраняет переводы строк, но позволяет перенос */
+
+		}
 
         #result {
             margin-top: 20px;
@@ -203,7 +209,7 @@
             <label for="limit">Количество отзывов:</label>
             <input type="number" id="limit" name="limit" placeholder="Введите количество отзывов" required>
             
-            <button type="submit">Обработать</button>
+            <button type="button" id="submitReview">Обработать</button>
         </form>
         
         <div id="progress-container">
@@ -214,49 +220,83 @@
         
         <p>Внимание: анализ проводится с помощью модели искусственного интеллекта, результат может быть нестабильным.</p>
     </div>
+	<div class="container">
+    <form id="searchForm">
+        <label for="tags">Введите теги игр:</label>
+        <input type="text" id="tags" name="tags" placeholder="Введите теги через запятую" required>
+        <button type="button" id="submitSearch">Искать игры</button>
+    </form>
+    
+    <div id="search-result"></div>
+</div>
     <script>
-        document.getElementById("reviewForm").addEventListener("submit", async function (event) {
-            event.preventDefault();
+        document.getElementById("submitReview").addEventListener("click", async function (event) {
+        const formData = new FormData(document.getElementById("reviewForm"));
+        const progressContainer = document.getElementById("progress-container");
+        const progressBar = document.getElementById("progress-bar");
+        const resultDiv = document.getElementById("result");
 
-            const formData = new FormData(this);
-            const progressContainer = document.getElementById("progress-container");
-            const progressBar = document.getElementById("progress-bar");
-            const resultDiv = document.getElementById("result");
+        document.body.style.overflow = "hidden";
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        resultDiv.innerHTML = "";
 
-            document.body.style.overflow = "hidden";
+        try {
+            progressBar.style.width = "30%";
+            await new Promise(resolve => setTimeout(resolve, 500));
 
-            progressContainer.style.display = "block";
-            progressBar.style.width = "0%";
-            resultDiv.innerHTML = "";
+            const response = await fetch("/process", {
+                method: "POST",
+                body: formData
+            });
 
-            try {
-                progressBar.style.width = "30%";
-                await new Promise(resolve => setTimeout(resolve, 500));
+            progressBar.style.width = "70%";
 
-                const response = await fetch("/process", {
-                    method: "POST",
-                    body: formData
-                });
+            if (!response.ok) throw new Error("Ошибка на сервере");
 
-                progressBar.style.width = "70%";
+            const data = await response.json();
+            progressBar.style.width = "100%";
 
-                if (!response.ok) throw new Error("РћС€РёР±РєР° РЅР° СЃРµСЂРІРµСЂРµ");
-
-                const data = await response.json();
-                progressBar.style.width = "100%";
-
-                if (data.success) {
-                    resultDiv.innerHTML = `<p class="warning">${data.review}</p>`;
-                } else {
-                    resultDiv.innerHTML = `<p style="color: red;">РћС€РёР±РєР°: ${data.error}</p>`;
-                }
-            } catch (error) {
-                progressBar.style.width = "100%";
-                resultDiv.innerHTML = `<p style="color: red;">РћС€РёР±РєР°: ${error.message}</p>`;
-            } finally {
-                document.body.style.overflow = "auto";
+            if (data.success) {
+                resultDiv.innerHTML = `<p class="warning">${data.review}</p>`;
+            } else {
+                resultDiv.innerHTML = `<p style="color: red;">Ошибка: ${data.error}</p>`;
             }
-        });
+        } catch (error) {
+            progressBar.style.width = "100%";
+            resultDiv.innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+        } finally {
+            document.body.style.overflow = "auto";
+        }
+    });
+
+    // Обработка формы поиска игр
+    document.getElementById("submitSearch").addEventListener("click", async function (event) {
+        const tags = document.getElementById("tags").value;
+        const resultDiv = document.getElementById("search-result");
+        
+        resultDiv.innerHTML = "<p>Идёт поиск...</p>";
+        
+        try {
+            const response = await fetch("/search_games", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "text/plain"
+                },
+                body: tags  // передаём текст напрямую
+            });
+            
+            if (response.ok) {
+                const text = await response.text();
+                resultDiv.innerHTML = `<pre>${text}</pre>`;  // Показываем результат как текст
+            } else {
+                const errorText = await response.text();
+                resultDiv.innerHTML = `<p style="color: red;">Ошибка: ${errorText}</p>`;
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+        }
+    });
 
         const themeToggle = document.getElementById("theme-toggle");
         const body = document.body;

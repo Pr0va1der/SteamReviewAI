@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from get_review import process_game_reviews
+from filter_ai import search_games
 import re
 import requests
 
@@ -38,6 +39,7 @@ def format_text(text):
 
 app = Flask(__name__)
 
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -68,6 +70,53 @@ def process():
     except Exception as e:
         print(f"Ошибка на сервере: {e}")
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+
+@app.route("/search_games", methods=["POST"])
+def search_games_route():
+    tags = request.data.decode("utf-8")  # Получаем текст как есть
+    
+    if not tags.strip():
+        return "Теги не указаны", 400
+    
+    games_result = search_games(tags)  # Отправляем текст в search_games
+    
+    #if not games_result.strip():
+    #    return "Игры не найдены", 404
+    
+     # Генерируем HTML-таблицу
+    result = """
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th style="border: 1px solid #ddd; padding: 8px;">Название</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">Цена</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">Метки</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">Ссылка</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    for game in games_result:
+        result += f"""
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 8px;">{game['Название']}</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">{game['Цена']}</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">{', '.join(game['Метки'])}</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">
+                    <a href="{game['Ссылка']}" target="_blank" style="color: #007bff;">Открыть</a>
+                </td>
+            </tr>
+        """
+    
+    result += """
+        </tbody>
+    </table>
+    """
+    
+    return result, 200, {"Content-Type": "text/html; charset=utf-8"}
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
