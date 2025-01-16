@@ -91,8 +91,8 @@ def search_games_route():
             <tr style="background-color: #f2f2f2;">
                 <th style="border: 1px solid #ddd; padding: 8px;">Название</th>
                 <th style="border: 1px solid #ddd; padding: 8px;">Цена</th>
-                <th style="border: 1px solid #ddd; padding: 8px;">Метки</th>
                 <th style="border: 1px solid #ddd; padding: 8px;">Ссылка</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">Метки</th>
             </tr>
         </thead>
         <tbody>
@@ -103,10 +103,10 @@ def search_games_route():
             <tr>
                 <td style="border: 1px solid #ddd; padding: 8px;">{game['Название']}</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{game['Цена']}</td>
-                <td style="border: 1px solid #ddd; padding: 8px;">{', '.join(game['Метки'])}</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">
                     <a href="{game['Ссылка']}" target="_blank" style="color: #007bff;">Открыть</a>
                 </td>
+                <td style="border: 1px solid #ddd; padding: 8px;">{', '.join(game['Метки'])}</td>
             </tr>
         """
     
