@@ -1,0 +1,170 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Review Analysis</title>
+    <link rel="icon" href="{% static 'logo.png' %}" type="image/x-icon">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="{% static 'css/styles.css' %}" rel="stylesheet">
+</head>
+
+<body class="dark-mode">
+
+    <div class="container">
+  <div class="d-flex justify-content-end my-3">
+  {% if user.is_authenticated %}
+    <form action="{% url 'logout' %}" method="post" class="d-inline ms-3">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">Выйти</button>
+    </form>
+  {% else %}
+    <a href="{% url 'login' %}" class="btn btn-success ms-3">Войти</a>
+    <a href="{% url 'register' %}" class="btn btn-success ms-3">Зарегистрироваться</a>
+  {% endif %}
+  
+  <button class="btn btn-secondary ms-3" id="toggle-theme">
+    <i class="fas fa-moon"></i>
+  </button>
+</div>
+
+  
+</div>
+
+        <!-- Reviews Form -->
+        <div id="reviews-form" class="form-container">
+            <div class="btn-group" role="group" aria-label="Form toggle">
+                <button type="button" class="btn btn-primary" id="toggle-reviews">Обработка отзывов</button>
+                <button type="button" class="btn btn-outline-primary" id="toggle-search">Поиск игр по тэгам</button>
+            </div>
+            <h2 class="text-center">Обработка отзывов Steam</h2>
+            <form id="reviewForm">
+                <div class="mb-3">
+                    <label for="game_url" class="form-label">Ссылка на игру:</label>
+                    <input type="url" class="form-control" id="game_url" name="game_url" placeholder="Введите ссылку на игру" required>
+                </div>
+                <div class="mb-3">
+                    <label for="limit" class="form-label">Количество отзывов:</label>
+                    <input type="number" class="form-control" id="limit" name="limit" value="10" placeholder="Введите количество отзывов" required>
+                    <div class="invalid-feedback">Введите число от 1 до 25.</div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="submitReview">Обработать</button>
+            </form>
+            <div id="loading-spinner" class="d-flex justify-content-center mt-3">
+                <div class="spinner-border text-primary" id='inner-load-spinner' role="status" style="display: none;">
+                    <span class="visually-hidden">Загрузка...</span>
+                </div>
+            </div>
+            <div id="result" class="mt-3"></div>
+            <p class="text-center text-danger mt-3"> Количество обрабатываемых отзывов ограничено 30 </p>
+            <p class="text-center text-danger mt-3">Внимание: анализ проводится с помощью модели искусственного интеллекта, результат может быть нестабильным.</p>
+        </div>
+
+        <!-- Search Form -->
+        <div id="search-form" class="form-container" style="display: none;">
+            <div class="btn-group" role="group" aria-label="Form toggle">
+                <button type="button" class="btn btn-outline-primary" id="toggle-reviews">Обработка отзывов</button>
+                <button type="button" class="btn btn-primary" id="toggle-search">Поиск игр по тэгам</button>
+            </div>
+            <h2 class="text-center">Поиск игр по тэгам</h2>
+            <form id="searchForm">
+                <div class="mb-3">
+                    <label for="tags" class="form-label">Введите теги игр:</label>
+                    <input type="text" class="form-control" id="tags" name="tags" placeholder="Введите теги через запятую" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="submitSearch">Искать игры</button>
+            </form>
+            <div id="search-loading-spinner" class="d-flex justify-content-center mt-3">
+                <div class="spinner-border text-primary" id="inner-load-spinner-filter" role="status" style="display: none;">
+                    <span class="visually-hidden">Загрузка...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Result Container -->
+    <div id="search-result-container" class="result-container" style="display: none;">
+        <h3 class="text-center">Результаты поиска</h3>
+        <div id="search-result" class="mt-3"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/scripts.js' %}"></script>
+    
+    <style>
+    body {
+        background: url("{% static 'steamheaven.png' %}") no-repeat center center fixed;
+        background-size: cover;
+    }
+    
+    body.dark-mode {
+        background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)),
+                    url("{% static 'steam.png' %}") no-repeat center center fixed;
+        background-size: cover;
+    }
+    </style>
+
+    <button id="open-overlay" class="btn btn-info position-fixed bottom-0 end-0 m-3 border-0" data-bs-toggle="modal" data-bs-target="#instructionModal" style="background-color: #007bff; color: white;">
+    Инструкция
+    </button>
+
+<div class="modal fade" id="instructionModal" tabindex="-1" aria-labelledby="instructionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title" id="instructionModalLabel">Инструкция</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body text-center">
+                <h1>Обработка отзывов Steam</h1>
+                <h4>1. Находим игру на сайте <a target="_blank" href="https://store.steampowered.com/" class="text-info">Steam</a></h4>
+                <h4>2. Копируем ссылку игры</h4>
+                <img src="{% static 'tut1.png' %}" alt="My Image" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light"><em>Нажмите на изображение, чтобы увеличить</em></figcaption>
+
+                <br><br>
+                <h4>3. Вставляем ссылку в первое поле</h4>
+                <img src="{% static 'tut2.png' %}" alt="My Image" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light"><em>Нажмите на изображение, чтобы увеличить</em></figcaption>
+
+                <br><br>
+                <h4>4. Вводим количество отзывов (не более 30, рекомендуемое значение - 10), и запускаем поиск</h4>
+                <img src="{% static 'tut3.png' %}" alt="My Image" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light"><em>Нажмите на изображение, чтобы увеличить</em></figcaption>
+
+                <br><br>
+                <h1>Поиск игр по тегам</h1>
+                <h4>1. В свободном стиле вводим теги игры (жанры, минимальную цену, максимальную цену, прочие теги)</h4>
+                <img src="{% static 'tut4.png' %}" alt="My Image" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light"><em>Нажмите на изображение, чтобы увеличить</em></figcaption>
+
+                <br><br>
+                <h4>2. Нажимаем "Искать игры" и ждём</h4>
+                <img src="{% static 'tut5.png' %}" alt="My Image" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light mb-3"><em>Нажмите на изображение, чтобы увеличить</em></figcaption>
+
+                <button type="button" class="btn btn-primary w-100 fs-3" data-bs-dismiss="modal">Понял!</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" class="img-fluid img-thumbnail">
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    
+</body>
+
+</html>

@@ -1,0 +1,194 @@
+{% load static %}
+{% load i18n %}
+{% get_current_language as LANGUAGE_CODE %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Review Analysis</title>
+    <link rel="icon" href="{% static 'logo.png' %}" type="image/x-icon">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="{% static 'css/styles.css' %}" rel="stylesheet">
+</head>
+
+<body class="dark-mode">
+
+    <div class="container mt-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <!-- Имя пользователя слева -->
+    <div>
+      {% if user.is_authenticated %}
+        <span class="text-light">
+          <i class="fas fa-user me-1"></i>{{ user.username }}
+        </span>
+      {% endif %}
+    </div>
+
+    <!-- Кнопки справа -->
+    <div class="d-flex align-items-center">
+      {% if user.is_authenticated %}
+        <form action="{% url 'logout' %}" method="post" class="d-inline me-2">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">{% trans "Выйти" %}</button>
+        </form>
+      {% else %}
+        <a href="{% url 'login' %}" class="btn btn-success me-2">{% trans "Войти" %}</a>
+        <a href="{% url 'register' %}" class="btn btn-success me-2">{% trans "Зарегистрироваться" %}</a>
+      {% endif %}
+
+      <button class="btn btn-secondary me-2" id="toggle-theme">
+        <i class="fas fa-moon"></i>
+      </button>
+
+      <form action="{% url 'set_language' %}" method="post" class="d-inline">
+        {% csrf_token %}
+        <input name="next" type="hidden" value="{{ request.path }}">
+        {% if LANGUAGE_CODE == 'ru' %}
+          <input type="hidden" name="language" value="en">
+          <button type="submit" class="btn btn-outline-primary">EN</button>
+        {% else %}
+          <input type="hidden" name="language" value="ru">
+          <button type="submit" class="btn btn-outline-primary">RU</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+
+        <!-- Reviews Form -->
+        <div id="reviews-form" class="form-container">
+            <div class="btn-group" role="group" aria-label="Form toggle">
+                <button type="button" class="btn btn-primary" id="toggle-reviews">{% trans "Обработка отзывов" %}</button>
+                <button type="button" class="btn btn-outline-primary" id="toggle-search">{% trans "Поиск игр по тэгам" %}</button>
+            </div>
+            <h2 class="text-center">{% trans "Обработка отзывов Steam" %}</h2>
+            <form id="reviewForm">
+                <div class="mb-3">
+                    <label for="game_url" class="form-label">{% trans "Ссылка на игру:" %}</label>
+                    <input type="url" class="form-control" id="game_url" name="game_url" placeholder="{% trans 'Введите ссылку на игру' %}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="limit" class="form-label">{% trans "Количество отзывов:" %}</label>
+                    <input type="number" class="form-control" id="limit" name="limit" value="10" placeholder="{% trans 'Введите количество отзывов' %}" required>
+                    <div class="invalid-feedback">{% trans "Введите число от 1 до 25." %}</div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="submitReview">{% trans "Обработать" %}</button>
+            </form>
+            <div id="loading-spinner" class="d-flex justify-content-center mt-3">
+                <div class="spinner-border text-primary" id='inner-load-spinner' role="status" style="display: none;">
+                    <span class="visually-hidden">{% trans "Загрузка..." %}</span>
+                </div>
+            </div>
+            <div id="result" class="mt-3"></div>
+            <p class="text-center text-danger mt-3">{% trans "Количество обрабатываемых отзывов ограничено 30" %}</p>
+            <p class="text-center text-danger mt-3">{% trans "Внимание: анализ проводится с помощью модели искусственного интеллекта, результат может быть нестабильным." %}</p>
+        </div>
+
+        <!-- Search Form -->
+        <div id="search-form" class="form-container" style="display: none;">
+            <div class="btn-group" role="group" aria-label="Form toggle">
+                <button type="button" class="btn btn-outline-primary" id="toggle-reviews">{% trans "Обработка отзывов" %}</button>
+                <button type="button" class="btn btn-primary" id="toggle-search">{% trans "Поиск игр по тэгам" %}</button>
+            </div>
+            <h2 class="text-center">{% trans "Поиск игр по тэгам" %}</h2>
+            <form id="searchForm">
+                <div class="mb-3">
+                    <label for="tags" class="form-label">{% trans "Введите теги игр:" %}</label>
+                    <input type="text" class="form-control" id="tags" name="tags" placeholder="{% trans 'Введите теги через запятую' %}" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="submitSearch">{% trans "Искать игры" %}</button>
+            </form>
+            <div id="search-loading-spinner" class="d-flex justify-content-center mt-3">
+                <div class="spinner-border text-primary" id="inner-load-spinner-filter" role="status" style="display: none;">
+                    <span class="visually-hidden">{% trans "Загрузка..." %}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Result Container -->
+    <div id="search-result-container" class="result-container" style="display: none;">
+        <h3 class="text-center">{% trans "Результаты поиска" %}</h3>
+        <div id="search-result" class="mt-3"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/scripts.js' %}"></script>
+    
+    <style>
+    body {
+        background: url("{% static 'steamheaven.png' %}") no-repeat center center fixed;
+        background-size: cover;
+    }
+    
+    body.dark-mode {
+        background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)),
+                    url("{% static 'steam.png' %}") no-repeat center center fixed;
+        background-size: cover;
+    }
+    </style>
+
+    <button id="open-overlay" class="btn btn-info position-fixed bottom-0 end-0 m-3 border-0" data-bs-toggle="modal" data-bs-target="#instructionModal" style="background-color: #007bff; color: white;">
+    {% trans "Инструкция" %}
+    </button>
+
+<div class="modal fade" id="instructionModal" tabindex="-1" aria-labelledby="instructionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title" id="instructionModalLabel">{% trans "Инструкция" %}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% trans 'Закрыть' %}"></button>
+            </div>
+            <div class="modal-body text-center">
+                <h1>{% trans "Обработка отзывов Steam" %}</h1>
+                <h4>{% trans "1. Находим игру на сайте" %}<a target="_blank" href="https://store.steampowered.com/" class="text-info">Steam</a></h4>
+                <h4>{% trans "2. Копируем ссылку игры" %}</h4>
+                <img src="{% static 'tut1_'|add:LANGUAGE_CODE|add:'.png' %}" alt="Banner" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light"><em>{% trans "Нажмите на изображение, чтобы увеличить" %}</em></figcaption>
+
+                <br><br>
+                <h4>{% trans "3. Вставляем ссылку в первое поле" %}</h4>
+                <img src="{% static 'tut2_'|add:LANGUAGE_CODE|add:'.png' %}" alt="Banner" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light"><em>{% trans "Нажмите на изображение, чтобы увеличить" %}</em></figcaption>
+
+                <br><br>
+                <h4>{% trans "4. Вводим количество отзывов (не более 30, рекомендуемое значение - 10), и запускаем поиск" %}</h4>
+                <img src="{% static 'tut3_'|add:LANGUAGE_CODE|add:'.png' %}" alt="Banner" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light"><em>{% trans "Нажмите на изображение, чтобы увеличить" %}</em></figcaption>
+
+                <br><br>
+                <h1>{% trans "Поиск игр по тегам" %}</h1>
+                <h4>{% trans "1. В свободном стиле вводим теги игры (жанры, минимальную цену, максимальную цену, прочие теги)" %}</h4>
+                <img src="{% static 'tut4_'|add:LANGUAGE_CODE|add:'.png' %}" alt="Banner" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light"><em>{% trans "Нажмите на изображение, чтобы увеличить" %}</em></figcaption>
+
+                <br><br>
+                <h4>{% trans '2. Нажимаем "Искать игры" и ждём' %}</h4>
+                <img src="{% static 'tut5_'|add:LANGUAGE_CODE|add:'.png' %}" alt="Banner" class="img-fluid w-50 custom-shadow">
+                <figcaption class="figure-caption text-light mb-3"><em>{% trans "Нажмите на изображение, чтобы увеличить" %}</em></figcaption>
+
+                <button type="button" class="btn btn-primary w-100 fs-3" data-bs-dismiss="modal">{% trans "Понял!" %}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" class="img-fluid img-thumbnail">
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    
+</body>
+
+</html>
